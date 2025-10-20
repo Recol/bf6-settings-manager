@@ -23,6 +23,20 @@ def main():
     try:
         logger.info("Starting Battlefield 6 Settings Manager")
 
+        # Check and request admin privileges
+        from src.admin import is_admin, run_as_admin
+
+        if not is_admin():
+            logger.warning("Not running as administrator")
+            logger.info("Requesting admin privileges...")
+            try:
+                run_as_admin()
+                # If we get here, elevation failed or was cancelled
+                logger.warning("Continuing without admin privileges (some features may not work)")
+            except Exception as e:
+                logger.warning(f"Admin elevation failed: {e}")
+                logger.warning("Continuing without admin privileges")
+
         from src.ui.main_window import main as ui_main
 
         # Launch Flet app

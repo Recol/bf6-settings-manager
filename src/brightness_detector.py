@@ -127,10 +127,10 @@ class BrightnessDetector:
                             extended_tag = extension[pos + 1]
 
                             # HDR Static Metadata (extended tag = 0x06)
-                            if extended_tag == 0x06 and block_length >= 3:
-                                # Byte at pos+3 contains max luminance code
-                                if pos + 3 < len(extension):
-                                    max_lum_code = extension[pos + 3]
+                            if extended_tag == 0x06 and block_length >= 4:
+                                # Byte at pos+4 contains max luminance code
+                                if pos + 4 < len(extension):
+                                    max_lum_code = extension[pos + 4]
 
                                     # Convert to nits using formula: 50 * 2^(code/32)
                                     if max_lum_code > 0:

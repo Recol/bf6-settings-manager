@@ -2,10 +2,10 @@
 name = "bf6-settings-manager"
 version = "1.0.0"
 description = "Battlefield 6 Settings Manager - Manage and optimize your BF6 settings"
-authors = [{name = "Your Name"}]
+authors = [{name = "Deco"}]
 requires-python = ">=3.12,<3.14"
 dependencies = [
-    "flet>=0.25.0",
+    "flet>=0.28.3",
     "psutil>=6.1.0",
     "pywin32>=308",
     "aiofiles>=24.1.0",

@@ -33,6 +33,7 @@ class MainWindow:
         self.status_text: Optional[ft.Text] = None
         self.apply_button: Optional[ft.ElevatedButton] = None
         self.progress_ring: Optional[ft.ProgressRing] = None
+        self.brightness_status_text: Optional[ft.Text] = None
 
     async def initialize(self) -> None:
         """Initialize the application."""
@@ -68,7 +69,7 @@ class MainWindow:
                 ),
             ], spacing=5),
             padding=20,
-            bgcolor=ft.Colors.SURFACE_VARIANT,
+            bgcolor=ft.Colors.SURFACE,
         )
 
         # HDR Section
@@ -117,10 +118,11 @@ class MainWindow:
     async def _build_hdr_section(self) -> ft.Container:
         """Build HDR configuration section."""
         self.progress_ring = ft.ProgressRing(width=16, height=16, visible=False)
+        self.brightness_status_text = ft.Text("Detecting HDR brightness...")
 
         brightness_status = ft.Row([
             ft.Icon(ft.Icons.BRIGHTNESS_7, color=ft.Colors.AMBER),
-            ft.Text("Detecting HDR brightness...", id="brightness_status"),
+            self.brightness_status_text,
             self.progress_ring,
         ], spacing=10)
 
@@ -267,17 +269,14 @@ class MainWindow:
 
             if brightness:
                 self.detected_brightness = brightness
-                brightness_text = f"Detected: {brightness} nits"
-                status_control = self.page.get_control("brightness_status")
-                if status_control:
-                    status_control.value = brightness_text
-                    status_control.color = ft.Colors.GREEN
+                if self.brightness_status_text:
+                    self.brightness_status_text.value = f"Detected: {brightness} nits"
+                    self.brightness_status_text.color = ft.Colors.GREEN
                     self.page.update()
             else:
-                status_control = self.page.get_control("brightness_status")
-                if status_control:
-                    status_control.value = "Could not detect - use custom value"
-                    status_control.color = ft.Colors.ORANGE
+                if self.brightness_status_text:
+                    self.brightness_status_text.value = "Could not detect - use custom value"
+                    self.brightness_status_text.color = ft.Colors.ORANGE
                     self.page.update()
 
         except Exception as e:
