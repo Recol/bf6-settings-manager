@@ -181,18 +181,26 @@ def find_msi_output():
     """Find and report the location of the generated MSI."""
     project_root = Path(__file__).parent
 
-    # Look for MSI files in the dist directory
-    dist_dir = project_root / "dist"
-    if dist_dir.exists():
-        msi_files = list(dist_dir.glob("**/*.msi"))
-        if msi_files:
-            print("\n🎉 MSI installer generated successfully!")
-            for msi_file in msi_files:
-                size_mb = msi_file.stat().st_size / (1024 * 1024)
-                print(f"   📦 {msi_file} ({size_mb:.1f} MB)")
-            return True
+    # Briefcase outputs to multiple locations
+    search_paths = [
+        project_root / "windows",  # Primary Briefcase output
+        project_root / "dist",     # Alternative output location
+    ]
 
-    print("\n⚠️  MSI file not found in expected location")
+    msi_files = []
+    for search_path in search_paths:
+        if search_path.exists():
+            msi_files.extend(list(search_path.glob("**/*.msi")))
+
+    if msi_files:
+        print("\n🎉 MSI installer generated successfully!")
+        for msi_file in msi_files:
+            size_mb = msi_file.stat().st_size / (1024 * 1024)
+            print(f"   📦 {msi_file} ({size_mb:.1f} MB)")
+        return True
+
+    print("\n⚠️  MSI file not found in expected locations")
+    print("   Searched: windows/, dist/")
     return False
 
 
