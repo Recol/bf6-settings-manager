@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class ProcessChecker:
     """Check for running game processes."""
 
-    GAME_PROCESSES = ["bf6.exe", "bf2042.exe"]  # Alternative process names
+    GAME_PROCESSES = ["bf6.exe"]  # Alternative process names
 
     @staticmethod
     async def is_game_running() -> Optional[dict]:

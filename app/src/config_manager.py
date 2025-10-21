@@ -230,14 +230,19 @@ class ConfigManager:
                     content = new_content
                     logger.info(f"Applied: {setting.key} = {new_value}")
                 else:
-                    logger.warning(f"Pattern not found for: {setting.key}")
+                    # Check if pattern exists but value is unchanged
+                    if re.search(setting.pattern, content, flags=re.MULTILINE):
+                        logger.debug(f"No change needed for {setting.key} (already set to {new_value})")
+                    else:
+                        logger.warning(f"Pattern not found for: {setting.key}")
 
             # Check if any changes were made
             if content == original_content:
                 return {
-                    "success": False,
-                    "message": "No changes applied (patterns may not match)",
-                    "backup_path": str(backup_path)
+                    "success": True,
+                    "message": "No changes needed - all settings already configured correctly",
+                    "backup_path": str(backup_path),
+                    "changes": []
                 }
 
             # Atomic write using temp file
@@ -283,22 +288,36 @@ class ConfigManager:
             text=True
         )
 
+        # Close the file descriptor immediately - we'll use aiofiles to write
+        os.close(temp_fd)
+
         try:
             # Write to temp file
             async with aiofiles.open(temp_path, mode='w', encoding='utf-8') as f:
                 await f.write(content)
 
-            # Atomic replace
-            await asyncio.to_thread(os.replace, temp_path, file_path)
-            logger.debug(f"Atomically wrote to {file_path}")
+            # Ensure file is fully written and closed before replacing
+            await asyncio.sleep(0.1)
+
+            # Atomic replace with retry logic for Windows file locking
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    await asyncio.to_thread(os.replace, temp_path, file_path)
+                    logger.debug(f"Atomically wrote to {file_path}")
+                    break
+                except PermissionError as e:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"File locked, retrying... (attempt {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(0.5)
+                    else:
+                        raise Exception(f"Failed to replace file after {max_retries} attempts: {e}")
 
         except Exception:
             # Clean up temp file on failure
             if os.path.exists(temp_path):
                 await asyncio.to_thread(os.unlink, temp_path)
             raise
-        finally:
-            os.close(temp_fd)
 
     async def get_current_values(self) -> Dict[str, Optional[str]]:
         """

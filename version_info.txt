@@ -14,11 +14,11 @@ VSVersionInfo(
       [
       StringTable(
         u'040904B0',
-        [StringStruct(u'CompanyName', u'Battlefield 6 Settings Manager'),
+        [StringStruct(u'PROJECT MATRIX LIMITED', u'Battlefield 6 Settings Manager'),
         StringStruct(u'FileDescription', u'Battlefield 6 Settings Manager'),
         StringStruct(u'FileVersion', u'1.0.0.0'),
         StringStruct(u'InternalName', u'bf6-settings-manager'),
-        StringStruct(u'LegalCopyright', u'Copyright (c) 2025'),
+        StringStruct(u'LegalCopyright', u'© 2025 SOFTWARE MATRIX LIMITED. All rights reserved.'),
         StringStruct(u'OriginalFilename', u'bf6-settings-manager.exe'),
         StringStruct(u'ProductName', u'Battlefield 6 Settings Manager'),
         StringStruct(u'ProductVersion', u'1.0.0.0')])
