@@ -2,7 +2,7 @@
 name = "bf6-settings-manager"
 version = "1.0.1"
 description = "Battlefield 6 Settings Manager - Manage and optimize your BF6 settings"
-authors = [{name = "Deco"}]
+authors = [{name = "SOFTWARE MATRIX LIMITED"}]
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.13"
@@ -62,7 +62,6 @@ formal_name = "Battlefield 6 Settings Manager"
 description = "Battlefield 6 Settings Manager - Manage and optimize your BF6 settings"
 license = {file = "LICENSE"}
 sources = ['app']
-console_app = true
 icon = "resources/icon"
 
 [tool.briefcase.app.app.windows]
