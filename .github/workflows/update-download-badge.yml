@@ -93,6 +93,6 @@ jobs:
           echo "No changes to commit"
         else
           git commit -m "Update download count badge"
-          git pull --rebase origin main
+          git pull --rebase origin master
           git push
         fi
