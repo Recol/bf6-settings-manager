@@ -80,7 +80,7 @@ C:\Users\{YourName}\Documents\Battlefield 6\settings\
   └── origin\PROFSAVE_profile
 ```
 
-Only one file exists depending on your launcher.
+Only one file exists depending on your launcher, you can also specify your own location.
 
 ## Settings Reference
 
