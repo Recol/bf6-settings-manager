@@ -1,6 +1,7 @@
+![Downloads](https://img.shields.io/badge/Downloads-55-blue) [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-donate-yellow.svg)](https://buymeacoffee.com/decouk) [![CodeQL Advanced](https://github.com/Recol/bf6-settings-manager/actions/workflows/codeql.yml/badge.svg)](https://github.com/Recol/bf6-settings-manager/actions/workflows/codeql.yml)
 # Battlefield 6 Settings Manager
 
-<img width="512" height="768" alt="bf6-settings-manager" src="https://github.com/user-attachments/assets/24f5d99d-308a-43f1-8cfa-64f82c5407a6" />
+<img width="256" height="384" alt="bf6-settings-manager" src="https://github.com/user-attachments/assets/24f5d99d-308a-43f1-8cfa-64f82c5407a6" />
 
 **Optimize your Battlefield 6 settings for competitive play**
 
@@ -80,7 +81,7 @@ C:\Users\{YourName}\Documents\Battlefield 6\settings\
   └── origin\PROFSAVE_profile
 ```
 
-Only one file exists depending on your launcher.
+Only one file exists depending on your launcher, you can also specify your own location.
 
 ## Settings Reference
 
