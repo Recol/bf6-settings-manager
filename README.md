@@ -1,4 +1,4 @@
-![Downloads](https://img.shields.io/badge/Downloads-55-blue)
+![Downloads](https://img.shields.io/badge/Downloads-55-blue) [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-donate-yellow.svg)](https://buymeacoffee.com/decouk) [![CodeQL](https://github.com/Recol/bf6-settings-manager/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/Recol/bf6-settings-manager/actions?query=workflow%3ACodeQL)
 # Battlefield 6 Settings Manager
 
 <img width="256" height="384" alt="bf6-settings-manager" src="https://github.com/user-attachments/assets/24f5d99d-308a-43f1-8cfa-64f82c5407a6" />
