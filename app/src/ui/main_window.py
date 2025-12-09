@@ -1,6 +1,8 @@
 """Main window for Battlefield 6 Settings Manager - Redesigned with card-based layout."""
 
 import logging
+import webbrowser
+from pathlib import Path
 from typing import Dict, Optional, List
 from datetime import datetime
 
@@ -9,6 +11,8 @@ import flet as ft
 from ..brightness_detector import BrightnessDetector
 from ..config_manager import ConfigManager, SETTINGS
 from ..process_checker import ProcessChecker
+from ..app_settings import get_app_settings
+from ..updater import UpdateChecker, CURRENT_VERSION
 from .theme import configure_page_theme
 from .theme_utils import (
     get_background_color,
@@ -17,9 +21,22 @@ from .theme_utils import (
     get_theme_colors,
     update_page_theme,
 )
-from .components import StatusChip, SettingCard, SettingRow, SearchBar
+from .components import (
+    StatusChip,
+    SettingCard,
+    SettingRow,
+    SearchBar,
+    SliderSetting,
+    DropdownSetting,
+)
 
 logger = logging.getLogger(__name__)
+
+# Constants
+DONATION_URL = "https://buymeacoffee.com/decouk"
+GITHUB_ISSUES_URL = "https://github.com/Recol/bf6-settings-manager/issues"
+DISCORD_URL = "https://discord.com/users/162568099839606784"
+TWITTER_URL = "https://x.com/iDeco_UK"
 
 
 class MainWindow:
@@ -28,8 +45,12 @@ class MainWindow:
     def __init__(self, page: ft.Page):
         """Initialize main window."""
         self.page = page
-        self.config_manager = ConfigManager()
+        self.app_settings = get_app_settings()
+        self.config_manager = ConfigManager(
+            custom_path=self.app_settings.custom_config_path
+        )
         self.brightness_detector = BrightnessDetector()
+        self.update_checker = UpdateChecker()
 
         # State
         self.detected_brightness: Optional[int] = None
@@ -38,19 +59,26 @@ class MainWindow:
         self.custom_brightness_field: Optional[ft.TextField] = None
         self.use_custom_brightness: bool = False
 
+        # New settings state
+        self.slider_settings: Dict[str, SliderSetting] = {}
+        self.dropdown_settings: Dict[str, DropdownSetting] = {}
+
         # UI components
         self.status_text: Optional[ft.Text] = None
         self.apply_button: Optional[ft.ElevatedButton] = None
         self.progress_ring: Optional[ft.ProgressRing] = None
         self.brightness_status_text: Optional[ft.Text] = None
         self.config_status_text: Optional[ft.Text] = None
+        self.config_path_text: Optional[ft.Text] = None
         self.search_bar: Optional[SearchBar] = None
+        self.file_picker: Optional[ft.FilePicker] = None
 
         # Theme-aware containers
         self.brightness_container: Optional[ft.Container] = None
         self.performance_info_container: Optional[ft.Container] = None
         self.audio_info_container: Optional[ft.Container] = None
         self.header_container: Optional[ft.Container] = None
+        self.display_info_container: Optional[ft.Container] = None
 
         # Cards
         self.hdr_card: Optional[SettingCard] = None
@@ -58,6 +86,8 @@ class MainWindow:
         self.performance_card: Optional[SettingCard] = None
         self.audio_card: Optional[SettingCard] = None
         self.actions_card: Optional[SettingCard] = None
+        self.display_card: Optional[SettingCard] = None
+        self.frame_rate_card: Optional[SettingCard] = None
 
         # All cards list for filtering
         self.all_cards: List[SettingCard] = []
@@ -67,6 +97,8 @@ class MainWindow:
         self.visual_status_chip: Optional[StatusChip] = None
         self.performance_status_chip: Optional[StatusChip] = None
         self.audio_status_chip: Optional[StatusChip] = None
+        self.display_status_chip: Optional[StatusChip] = None
+        self.frame_rate_status_chip: Optional[StatusChip] = None
 
     async def initialize(self) -> None:
         """Initialize the application."""
@@ -87,6 +119,10 @@ class MainWindow:
 
     async def build_ui(self) -> None:
         """Build the user interface with card-based layout."""
+        # File picker for custom config path
+        self.file_picker = ft.FilePicker(on_result=self._on_file_picker_result)
+        self.page.overlay.append(self.file_picker)
+
         # Header with title and theme toggle
         self.header_container = self._build_header()
 
@@ -100,6 +136,8 @@ class MainWindow:
         # Build cards
         self.hdr_card = await self._build_hdr_card()
         self.visual_card = self._build_visual_clarity_card()
+        self.display_card = self._build_display_card()
+        self.frame_rate_card = self._build_frame_rate_card()
         self.performance_card = self._build_performance_card()
         self.audio_card = self._build_audio_card()
         self.actions_card = self._build_actions_card()
@@ -108,6 +146,8 @@ class MainWindow:
         self.all_cards = [
             self.hdr_card,
             self.visual_card,
+            self.display_card,
+            self.frame_rate_card,
             self.performance_card,
             self.audio_card,
             self.actions_card,
@@ -118,6 +158,8 @@ class MainWindow:
             controls=[
                 ft.Container(content=self.hdr_card, col={"sm": 12, "md": 6}, padding=8),
                 ft.Container(content=self.visual_card, col={"sm": 12, "md": 6}, padding=8),
+                ft.Container(content=self.display_card, col={"sm": 12, "md": 6}, padding=8),
+                ft.Container(content=self.frame_rate_card, col={"sm": 12, "md": 6}, padding=8),
                 ft.Container(content=self.performance_card, col={"sm": 12, "md": 6}, padding=8),
                 ft.Container(content=self.audio_card, col={"sm": 12, "md": 6}, padding=8),
                 ft.Container(content=self.actions_card, col={"sm": 12}, padding=8),
@@ -150,27 +192,76 @@ class MainWindow:
         self.page.update()
 
     def _build_header(self) -> ft.Container:
-        """Build application header with title and controls."""
+        """Build application header with title, version, and action buttons."""
         return ft.Container(
             content=ft.Row(
                 controls=[
                     ft.Icon(ft.Icons.SPORTS_ESPORTS, size=32, color=get_status_color(self.page, "info")),
                     ft.Column(
                         controls=[
-                            ft.Text(
-                                "Battlefield 6 Settings Manager - Beta (By Deco)",
-                                size=24,
-                                weight=ft.FontWeight.BOLD,
-                                color=get_text_color(self.page, "primary"),
+                            ft.Row(
+                                controls=[
+                                    ft.Text(
+                                        "Battlefield 6 Settings Manager",
+                                        size=24,
+                                        weight=ft.FontWeight.BOLD,
+                                        color=get_text_color(self.page, "primary"),
+                                    ),
+                                    ft.Container(
+                                        content=ft.Text(
+                                            f"v{CURRENT_VERSION}",
+                                            size=12,
+                                            color=get_text_color(self.page, "secondary"),
+                                        ),
+                                        bgcolor=get_background_color(self.page, "variant"),
+                                        padding=ft.padding.symmetric(horizontal=8, vertical=2),
+                                        border_radius=4,
+                                    ),
+                                ],
+                                spacing=8,
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
                             ),
                             ft.Text(
-                                "Optimize your game settings for competitive play",
+                                "Optimize your game settings for competitive play (By Deco)",
                                 size=13,
                                 color=get_text_color(self.page, "secondary"),
                             ),
                         ],
                         spacing=2,
                         expand=True,
+                    ),
+                    ft.OutlinedButton(
+                        "Updates",
+                        icon=ft.Icons.DOWNLOAD,
+                        on_click=self._on_updates_click,
+                        tooltip="Check for updates",
+                    ),
+                    ft.OutlinedButton(
+                        "Notes",
+                        icon=ft.Icons.DESCRIPTION,
+                        on_click=self._on_notes_click,
+                        tooltip="View release notes",
+                    ),
+                    ft.OutlinedButton(
+                        "Donate",
+                        icon=ft.Icons.FAVORITE,
+                        on_click=lambda _: webbrowser.open(DONATION_URL),
+                        tooltip="Support development",
+                        style=ft.ButtonStyle(
+                            color={"": "#e91e63"},
+                        ),
+                    ),
+                    ft.OutlinedButton(
+                        "Contact",
+                        icon=ft.Icons.CHAT,
+                        on_click=self._on_contact_click,
+                        tooltip="Get in touch",
+                    ),
+                    ft.OutlinedButton(
+                        "Report Issue",
+                        icon=ft.Icons.BUG_REPORT,
+                        on_click=lambda _: webbrowser.open(GITHUB_ISSUES_URL),
+                        tooltip="Report a bug on GitHub",
                     ),
                     ft.IconButton(
                         icon=ft.Icons.BRIGHTNESS_6,
@@ -180,6 +271,7 @@ class MainWindow:
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=12,
             ),
             bgcolor=get_background_color(self.page, "surface"),
             padding=20,
@@ -443,6 +535,172 @@ class MainWindow:
             collapsible=True,
         )
 
+    def _build_display_card(self) -> SettingCard:
+        """Build display settings card (HDR mode, UI scale, brightness, VSync)."""
+        # Status chip
+        self.display_status_chip = StatusChip(
+            self.page,
+            text="Active",
+            status="success",
+        )
+
+        # HDR Mode toggle
+        hdr_mode_row = SettingRow(
+            self.page,
+            label="Enable HDR Mode",
+            icon=ft.Icons.HDR_ON,
+            value=True,
+            on_change=lambda e: self._update_display_status(),
+            icon_color="#ff9800",  # Amber
+        )
+        self.settings_checkboxes["hdr_mode"] = hdr_mode_row.checkbox
+
+        # UI Scale Factor slider
+        ui_scale_slider = SliderSetting(
+            self.page,
+            label="UI Scale Factor",
+            min_val=0.5,
+            max_val=1.0,
+            initial_value=0.5,
+            step=0.05,
+            decimals=2,
+            icon=ft.Icons.ASPECT_RATIO,
+            warning_text="Higher values improve sharpness but may impact performance",
+            on_change_end=lambda v: self._on_slider_change("ui_scale_factor", v),
+        )
+        self.slider_settings["ui_scale_factor"] = ui_scale_slider
+
+        # UI Brightness slider
+        ui_brightness_slider = SliderSetting(
+            self.page,
+            label="UI Brightness",
+            min_val=0.0,
+            max_val=1.0,
+            initial_value=0.5,
+            step=0.05,
+            decimals=2,
+            icon=ft.Icons.BRIGHTNESS_MEDIUM,
+            on_change_end=lambda v: self._on_slider_change("ui_brightness", v),
+        )
+        self.slider_settings["ui_brightness"] = ui_brightness_slider
+
+        # VSync Mode dropdown
+        vsync_dropdown = DropdownSetting(
+            self.page,
+            label="VSync Mode",
+            options=[
+                ("0", "Off (Recommended)"),
+                ("1", "On"),
+                ("2", "Adaptive"),
+            ],
+            initial_value="0",
+            icon=ft.Icons.SYNC,
+            descriptions={
+                "0": "Lowest input lag - recommended for competitive",
+                "1": "Standard VSync - eliminates tearing",
+                "2": "VSync only when above refresh rate",
+            },
+            on_change=lambda v: self._on_dropdown_change("vsync_mode", v),
+        )
+        self.dropdown_settings["vsync_mode"] = vsync_dropdown
+
+        content = [
+            hdr_mode_row,
+            ui_scale_slider,
+            ui_brightness_slider,
+            vsync_dropdown,
+        ]
+
+        return SettingCard(
+            self.page,
+            title="Display Settings",
+            icon=ft.Icons.DISPLAY_SETTINGS,
+            icon_color="#e91e63",  # Pink
+            subtitle="Configure display and rendering options",
+            status_chip=self.display_status_chip,
+            content=content,
+            expanded=True,
+            collapsible=True,
+        )
+
+    def _build_frame_rate_card(self) -> SettingCard:
+        """Build frame rate settings card."""
+        # Status chip
+        self.frame_rate_status_chip = StatusChip(
+            self.page,
+            text="Active",
+            status="success",
+        )
+
+        # Frame limiter enable toggle
+        limiter_row = SettingRow(
+            self.page,
+            label="Enable Frame Limiter",
+            icon=ft.Icons.TIMER,
+            value=True,
+            on_change=lambda e: self._update_frame_rate_status(),
+        )
+        self.settings_checkboxes["frame_rate_limiter_enable"] = limiter_row.checkbox
+
+        # Frame rate limit slider
+        fps_slider = SliderSetting(
+            self.page,
+            label="Frame Rate Limit",
+            min_val=30,
+            max_val=500,
+            initial_value=240,
+            step=1,
+            suffix=" FPS",
+            decimals=0,
+            icon=ft.Icons.SPEED,
+            on_change_end=lambda v: self._on_slider_change("frame_rate_limit", v),
+        )
+        self.slider_settings["frame_rate_limit"] = fps_slider
+
+        # Menu frame limiter enable toggle
+        menu_limiter_row = SettingRow(
+            self.page,
+            label="Enable Menu Frame Limiter",
+            icon=ft.Icons.TIMER,
+            value=True,
+            on_change=lambda e: self._update_frame_rate_status(),
+        )
+        self.settings_checkboxes["frame_rate_limiter_menu_enable"] = menu_limiter_row.checkbox
+
+        # Menu frame rate limit slider
+        menu_fps_slider = SliderSetting(
+            self.page,
+            label="Menu Frame Rate Limit",
+            min_val=30,
+            max_val=500,
+            initial_value=151,
+            step=1,
+            suffix=" FPS",
+            decimals=0,
+            icon=ft.Icons.MENU,
+            on_change_end=lambda v: self._on_slider_change("frame_rate_limit_menu", v),
+        )
+        self.slider_settings["frame_rate_limit_menu"] = menu_fps_slider
+
+        content = [
+            limiter_row,
+            fps_slider,
+            menu_limiter_row,
+            menu_fps_slider,
+        ]
+
+        return SettingCard(
+            self.page,
+            title="Frame Rate Settings",
+            icon=ft.Icons.SPEED,
+            icon_color="#ff5722",  # Deep Orange
+            subtitle="Configure frame rate limits",
+            status_chip=self.frame_rate_status_chip,
+            content=content,
+            expanded=True,
+            collapsible=True,
+        )
+
     def _build_actions_card(self) -> SettingCard:
         """Build quick actions card."""
         # Config status with stored reference
@@ -452,6 +710,16 @@ class MainWindow:
             color=get_text_color(self.page, "secondary"),
         )
 
+        # Config path text for browse feature
+        self.config_path_text = ft.Text(
+            "Path: Auto-detect",
+            size=12,
+            color=get_text_color(self.page, "hint"),
+            overflow=ft.TextOverflow.ELLIPSIS,
+            expand=True,
+        )
+
+        # Config status section with browse button
         config_status = ft.Column(
             controls=[
                 ft.Text(
@@ -461,6 +729,25 @@ class MainWindow:
                     color=get_text_color(self.page, "primary"),
                 ),
                 self.config_status_text,
+                ft.Row(
+                    controls=[
+                        self.config_path_text,
+                        ft.OutlinedButton(
+                            "Browse",
+                            icon=ft.Icons.FOLDER_OPEN,
+                            on_click=self._browse_config_file,
+                            tooltip="Select custom config file location",
+                        ),
+                        ft.IconButton(
+                            icon=ft.Icons.REFRESH,
+                            icon_size=18,
+                            tooltip="Reset to auto-detect",
+                            on_click=self._reset_config_path,
+                        ),
+                    ],
+                    spacing=8,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
             ],
             spacing=4,
         )
@@ -540,6 +827,16 @@ class MainWindow:
         # Refresh search bar
         if self.search_bar:
             self.search_bar.refresh_theme()
+
+        # Refresh slider settings
+        for slider in self.slider_settings.values():
+            if slider:
+                slider.refresh_theme()
+
+        # Refresh dropdown settings
+        for dropdown in self.dropdown_settings.values():
+            if dropdown:
+                dropdown.refresh_theme()
 
         # Refresh theme-aware containers - update colors without calling update()
         if self.brightness_container:
@@ -690,6 +987,272 @@ class MainWindow:
                 else:
                     self.audio_status_chip.update_status("Inactive", "info")
 
+    def _update_display_status(self):
+        """Update display settings status chip."""
+        if "hdr_mode" in self.settings_checkboxes:
+            is_hdr_enabled = self.settings_checkboxes["hdr_mode"].value
+            if self.display_status_chip:
+                if is_hdr_enabled:
+                    self.display_status_chip.update_status("HDR On", "success")
+                else:
+                    self.display_status_chip.update_status("HDR Off", "info")
+
+    def _update_frame_rate_status(self):
+        """Update frame rate settings status chip."""
+        limiter_keys = ["frame_rate_limiter_enable", "frame_rate_limiter_menu_enable"]
+        active_count = sum(
+            1 for k in limiter_keys
+            if k in self.settings_checkboxes and self.settings_checkboxes[k].value
+        )
+
+        if self.frame_rate_status_chip:
+            if active_count == 2:
+                self.frame_rate_status_chip.update_status("2/2 Active", "success")
+            elif active_count > 0:
+                self.frame_rate_status_chip.update_status(f"{active_count}/2 Active", "warning")
+            else:
+                self.frame_rate_status_chip.update_status("Disabled", "info")
+
+    def _on_slider_change(self, setting_id: str, value: float):
+        """Handle slider value change."""
+        logger.debug(f"Slider changed: {setting_id} = {value}")
+        # Value will be applied when Apply All Settings is clicked
+
+    def _on_dropdown_change(self, setting_id: str, value: str):
+        """Handle dropdown value change."""
+        logger.debug(f"Dropdown changed: {setting_id} = {value}")
+        # Value will be applied when Apply All Settings is clicked
+
+    def _browse_config_file(self, e):
+        """Open file picker to select custom config file."""
+        if self.file_picker:
+            self.file_picker.pick_files(
+                dialog_title="Select PROFSAVE_profile",
+                allowed_extensions=[""],
+                allow_multiple=False,
+            )
+
+    def _on_file_picker_result(self, e: ft.FilePickerResultEvent):
+        """Handle file picker result."""
+        if e.files and len(e.files) > 0:
+            selected_path = e.files[0].path
+            logger.info(f"Selected config path: {selected_path}")
+
+            # Save to app settings
+            self.app_settings.custom_config_path = selected_path
+
+            # Update config manager
+            self.config_manager.set_custom_path(selected_path)
+
+            # Re-detect config file
+            self.page.run_task(self.find_config_file)
+
+            # Update path display
+            if self.config_path_text:
+                self.config_path_text.value = f"Path: {selected_path}"
+                self.config_path_text.update()
+
+    def _reset_config_path(self, e):
+        """Reset to auto-detect config path."""
+        logger.info("Resetting to auto-detect config path")
+
+        # Clear custom path
+        self.app_settings.custom_config_path = None
+        self.config_manager.set_custom_path(None)
+
+        # Re-detect config file
+        self.page.run_task(self.find_config_file)
+
+        # Update path display
+        if self.config_path_text:
+            self.config_path_text.value = "Path: Auto-detect"
+            self.config_path_text.update()
+
+    async def _check_for_updates(self):
+        """Check for application updates."""
+        try:
+            result = await self.update_checker.check_for_updates()
+
+            def close_dlg(e):
+                dlg.open = False
+                self.page.update()
+
+            def download_and_close(e):
+                dlg.open = False
+                self.page.update()
+                self._download_update(result.get("download_url"))
+
+            if result.get("error"):
+                # Show error dialog
+                dlg = ft.AlertDialog(
+                    modal=True,
+                    title=ft.Text("Update Check Failed"),
+                    content=ft.Text(f"Could not check for updates:\n{result['error']}"),
+                    actions=[
+                        ft.TextButton("OK", on_click=close_dlg),
+                    ],
+                )
+                self.page.overlay.append(dlg)
+                dlg.open = True
+                self.page.update()
+                return
+
+            if result.get("update_available"):
+                # Show update available dialog
+                dlg = ft.AlertDialog(
+                    modal=True,
+                    title=ft.Row([
+                        ft.Icon(ft.Icons.SYSTEM_UPDATE, color="#4caf50", size=32),
+                        ft.Text("Update Available", size=20),
+                    ]),
+                    content=ft.Column(
+                        controls=[
+                            ft.Text(
+                                f"A new version is available: v{result['latest_version']}\n"
+                                f"You are currently on: v{CURRENT_VERSION}"
+                            ),
+                            ft.Text(
+                                "Would you like to download the update?",
+                                color=get_text_color(self.page, "secondary"),
+                            ),
+                        ],
+                        tight=True,
+                        spacing=12,
+                    ),
+                    actions=[
+                        ft.TextButton("Download", on_click=download_and_close),
+                        ft.TextButton("Later", on_click=close_dlg),
+                    ],
+                )
+                self.page.overlay.append(dlg)
+                dlg.open = True
+                self.page.update()
+            else:
+                # Already up to date
+                dlg = ft.AlertDialog(
+                    modal=True,
+                    title=ft.Text("Up to Date"),
+                    content=ft.Text(f"You are running the latest version (v{CURRENT_VERSION})."),
+                    actions=[
+                        ft.TextButton("OK", on_click=close_dlg),
+                    ],
+                )
+                self.page.overlay.append(dlg)
+                dlg.open = True
+                self.page.update()
+
+        except Exception as e:
+            logger.error(f"Update check failed: {e}")
+
+    def _on_updates_click(self, e):
+        """Handle Updates button click."""
+        self.page.run_task(self._check_for_updates)
+
+    def _on_notes_click(self, e):
+        """Handle Notes button click."""
+        self._show_release_notes_dialog()
+
+    def _on_contact_click(self, e):
+        """Handle Contact button click."""
+        self._show_contact_dialog()
+
+    def _show_contact_dialog(self):
+        """Show contact options dialog."""
+        def close_dialog(e):
+            dialog.open = False
+            self.page.update()
+
+        def open_discord(e):
+            webbrowser.open(DISCORD_URL)
+
+        def open_twitter(e):
+            webbrowser.open(TWITTER_URL)
+
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Row([
+                ft.Icon(ft.Icons.CHAT, color=get_status_color(self.page, "info"), size=24),
+                ft.Text("Contact", size=18, weight=ft.FontWeight.BOLD),
+            ]),
+            content=ft.Column(
+                controls=[
+                    ft.Text("Get in touch via:", size=14),
+                    ft.ElevatedButton(
+                        "Discord",
+                        icon=ft.Icons.DISCORD,
+                        on_click=open_discord,
+                        width=200,
+                    ),
+                    ft.ElevatedButton(
+                        "Twitter / X",
+                        icon=ft.Icons.ALTERNATE_EMAIL,
+                        on_click=open_twitter,
+                        width=200,
+                    ),
+                ],
+                spacing=12,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            actions=[
+                ft.TextButton("Close", on_click=close_dialog),
+            ],
+        )
+        self.page.overlay.append(dialog)
+        dialog.open = True
+        self.page.update()
+
+    def _download_update(self, download_url: str):
+        """Open download URL in browser."""
+        self._close_dialog()
+        if download_url:
+            webbrowser.open(download_url)
+        else:
+            # Fallback to releases page
+            self.update_checker.open_releases_page()
+
+    def _show_release_notes_dialog(self):
+        """Show release notes dialog."""
+        try:
+            # Navigate from main_window.py to project root: ui -> src -> app -> project_root
+            notes_path = Path(__file__).parent.parent.parent.parent / "RELEASE_NOTES.md"
+            if notes_path.exists():
+                content = notes_path.read_text(encoding='utf-8')
+            else:
+                content = "Release notes not available."
+        except Exception as e:
+            logger.error(f"Failed to load release notes: {e}")
+            content = f"Error loading release notes: {e}"
+
+        def close_dialog(e):
+            dialog.open = False
+            self.page.update()
+
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Row([
+                ft.Icon(ft.Icons.DESCRIPTION, color=get_status_color(self.page, "info"), size=24),
+                ft.Text("Release Notes", size=18, weight=ft.FontWeight.BOLD),
+            ]),
+            content=ft.Column(
+                controls=[
+                    ft.Markdown(
+                        content,
+                        selectable=True,
+                        extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
+                    ),
+                ],
+                width=500,
+                height=350,
+                scroll=ft.ScrollMode.AUTO,
+            ),
+            actions=[
+                ft.TextButton("Close", on_click=close_dialog),
+            ],
+        )
+        self.page.overlay.append(dialog)
+        dialog.open = True
+        self.page.update()
+
     def _handle_search(self, search_text: str):
         """Handle search filtering."""
         search_text = search_text.lower().strip()
@@ -830,11 +1393,30 @@ class MainWindow:
             elif self.detected_brightness:
                 settings_to_apply["hdr_peak_brightness"] = f"{self.detected_brightness:.6f}"
 
-            # Other settings
+            # Checkbox settings (toggle on/off)
             for setting_id, checkbox in self.settings_checkboxes.items():
                 if checkbox.value:
                     setting = SETTINGS[setting_id]
                     settings_to_apply[setting_id] = setting.default_value
+                elif setting_id in SETTINGS:
+                    # For toggle settings, set to 0 when unchecked
+                    if setting_id in ["hdr_mode", "frame_rate_limiter_enable", "frame_rate_limiter_menu_enable"]:
+                        settings_to_apply[setting_id] = "0"
+
+            # Slider settings (numeric values)
+            for setting_id, slider in self.slider_settings.items():
+                if setting_id in SETTINGS:
+                    value = slider.get_value()
+                    # Format based on setting type
+                    if setting_id in ["frame_rate_limit", "frame_rate_limit_menu"]:
+                        settings_to_apply[setting_id] = f"{value:.6f}"
+                    else:
+                        settings_to_apply[setting_id] = f"{value:.6f}"
+
+            # Dropdown settings
+            for setting_id, dropdown in self.dropdown_settings.items():
+                if setting_id in SETTINGS:
+                    settings_to_apply[setting_id] = dropdown.get_value()
 
             if not settings_to_apply:
                 self._update_status("No settings selected", "warning")

@@ -39,7 +39,7 @@ Reduce input lag and improve responsiveness:
 ## Installation
 
 ### Download MSI Installer
-1. Download the latest `BF6-Settings-Manager-v1.0.0.msi` from [Releases](https://github.com/your-repo/bf6-settings-manager/releases)
+1. Download the latest `BF6-Settings-Manager.msi` from [Releases](https://github.com/your-repo/bf6-settings-manager/releases)
 2. Double-click to install
 3. Launch from Start Menu: "Battlefield 6 Settings Manager"
 

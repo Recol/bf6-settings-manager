@@ -120,6 +120,50 @@ SETTINGS = {
         "0.000000",
         "Tinnitus Effect Volume"
     ),
+
+    # Display Settings
+    "hdr_mode": ConfigSetting(
+        "GstRender.HighDynamicRangeMode",
+        "1",
+        "HDR Mode Enable/Disable"
+    ),
+    "ui_scale_factor": ConfigSetting(
+        "GstRender.HighResUIScaleFactor",
+        "0.500000",
+        "High Resolution UI Scale Factor"
+    ),
+    "ui_brightness": ConfigSetting(
+        "GstRender.UIBrightness",
+        "0.500000",
+        "UI Brightness"
+    ),
+    "vsync_mode": ConfigSetting(
+        "GstRender.VSyncMode",
+        "0",
+        "VSync Mode"
+    ),
+
+    # Frame Rate Settings
+    "frame_rate_limit": ConfigSetting(
+        "GstRender.FrameRateLimit",
+        "240.000000",
+        "Frame Rate Limit (In-Game)"
+    ),
+    "frame_rate_limit_menu": ConfigSetting(
+        "GstRender.FrameRateLimitMenu",
+        "151.000000",
+        "Frame Rate Limit (Menu)"
+    ),
+    "frame_rate_limiter_enable": ConfigSetting(
+        "GstRender.FrameRateLimiterEnable",
+        "1",
+        "Frame Rate Limiter Enable"
+    ),
+    "frame_rate_limiter_menu_enable": ConfigSetting(
+        "GstRender.FrameRateLimiterMenuEnable",
+        "1",
+        "Frame Rate Limiter Menu Enable"
+    ),
 }
 
 
@@ -128,20 +172,38 @@ class ConfigManager:
 
     CONFIG_FILENAME = "PROFSAVE_profile"
 
-    def __init__(self):
-        """Initialize config manager."""
+    def __init__(self, custom_path: Optional[str] = None):
+        """
+        Initialize config manager.
+
+        Args:
+            custom_path: Optional custom path to config file (overrides default search)
+        """
         self.documents = Path.home() / "Documents"
         self.bf6_settings_path = self.documents / "Battlefield 6" / "settings"
         self.config_path: Optional[Path] = None
+        self.custom_path: Optional[str] = custom_path
 
     async def find_config_file(self) -> Optional[Path]:
         """
         Find the PROFSAVE_profile file.
 
+        First checks custom_path if set, then searches default locations.
+
         Returns:
             Path to config file, or None if not found
         """
         def _search():
+            # First, try custom path if set
+            if self.custom_path:
+                custom = Path(self.custom_path)
+                if custom.exists() and custom.is_file():
+                    logger.info(f"Using custom config path: {custom}")
+                    return custom
+                else:
+                    logger.warning(f"Custom config path not found: {custom}")
+
+            # Fall back to default search
             if not self.bf6_settings_path.exists():
                 logger.warning(f"BF6 settings path not found: {self.bf6_settings_path}")
                 return None
@@ -156,6 +218,16 @@ class ConfigManager:
         loop = asyncio.get_event_loop()
         self.config_path = await loop.run_in_executor(None, _search)
         return self.config_path
+
+    def set_custom_path(self, path: Optional[str]) -> None:
+        """
+        Set custom config file path.
+
+        Args:
+            path: Custom path to config file, or None to use default
+        """
+        self.custom_path = path
+        self.config_path = None  # Reset to force re-detection
 
     async def create_backup(self, file_path: Path) -> Path:
         """
