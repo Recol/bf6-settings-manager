@@ -1,5 +1,7 @@
 # Battlefield 6 Settings Manager
 
+<img width="1024" height="1536" alt="bf6-settings-manager" src="https://github.com/user-attachments/assets/24f5d99d-308a-43f1-8cfa-64f82c5407a6" />
+
 **Optimize your Battlefield 6 settings for competitive play**
 
 A standalone Windows application that automatically detects your monitor's HDR peak brightness and applies optimal game settings for competitive gameplay. No more digging through config files or dealing with settings the game doesn't expose!
